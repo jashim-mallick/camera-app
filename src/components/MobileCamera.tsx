@@ -13,6 +13,7 @@ interface MobileCameraProps {
 
 const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 	const webcamRef = useRef<Webcam>(null);
+	const imageRef = useRef<string | null>(null);
 	const [open, setOpen] = useState(false);
 	const [facingMode, setFacingMode] = useState<"user" | "environment">(
 		"environment",
@@ -48,9 +49,12 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 			(blob) => {
 				if (!blob) return;
 
-				revokeImage();
+				if (imageRef.current) {
+					URL.revokeObjectURL(imageRef.current);
+				}
 
 				const url = URL.createObjectURL(blob);
+				imageRef.current = url;
 				setCaptured(url);
 				onCapture?.(blob);
 			},
@@ -65,11 +69,15 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 
 	const closeCamera = () => {
 		stopStream();
-		revokeImage(captured);
+
+		if (imageRef.current) {
+			URL.revokeObjectURL(imageRef.current);
+			imageRef.current = null;
+		}
+
 		setCaptured(null);
 		setOpen(false);
 	};
-
 	const stopStream = () => {
 		const stream = webcamRef.current?.video?.srcObject as MediaStream | null;
 		stream?.getTracks().forEach((track) => track.stop());
@@ -78,7 +86,10 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 	useEffect(() => {
 		return () => {
 			stopStream();
-			revokeImage();
+
+			if (imageRef.current) {
+				URL.revokeObjectURL(imageRef.current);
+			}
 		};
 	}, []);
 
