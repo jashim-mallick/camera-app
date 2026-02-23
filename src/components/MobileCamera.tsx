@@ -1,14 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
 
-import { RotateCcw, X } from "lucide-react";
+import { Camera, RotateCcw, X } from "lucide-react";
 import { Button } from "./shadcnui/button";
 
 interface MobileCameraProps {
-	onCapture?: (img: string) => void;
+	onCapture?: (blob: Blob) => void;
 }
 
 const MobileCamera = ({ onCapture }: MobileCameraProps) => {
@@ -18,6 +18,10 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 		"environment",
 	);
 	const [captured, setCaptured] = useState<string | null>(null);
+
+	const revokeImage = (url?: string | null) => {
+		if (url) URL.revokeObjectURL(url);
+	};
 
 	const capture = () => {
 		const video = webcamRef.current?.video;
@@ -40,10 +44,19 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 
 		ctx.drawImage(video, 0, 0, width, height);
 
-		const imageSrc = canvas.toDataURL("image/jpeg", 1);
+		canvas.toBlob(
+			(blob) => {
+				if (!blob) return;
 
-		setCaptured(imageSrc);
-		onCapture?.(imageSrc);
+				revokeImage();
+
+				const url = URL.createObjectURL(blob);
+				setCaptured(url);
+				onCapture?.(blob);
+			},
+			"image/jpeg",
+			0.95,
+		);
 	};
 
 	const switchCamera = () => {
@@ -51,17 +64,34 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 	};
 
 	const closeCamera = () => {
+		stopStream();
+		revokeImage(captured);
 		setCaptured(null);
 		setOpen(false);
 	};
 
+	const stopStream = () => {
+		const stream = webcamRef.current?.video?.srcObject as MediaStream | null;
+		stream?.getTracks().forEach((track) => track.stop());
+	};
+
+	useEffect(() => {
+		return () => {
+			stopStream();
+			revokeImage();
+		};
+	}, []);
+
 	return (
 		<>
-			{!open && <Button onClick={() => setOpen(true)}>Open Camera</Button>}
+			{!open && (
+				<Button onClick={() => setOpen(true)}>
+					<Camera size={32} />
+				</Button>
+			)}
 
 			{open && (
 				<div className="fixed inset-0 z-50 bg-black">
-					{/* Top Controls */}
 					<div className="absolute top-4 right-4 left-4 z-10 flex items-center justify-between text-white">
 						<Button
 							size="icon"
@@ -80,17 +110,15 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 						</Button>
 					</div>
 
-					{/* Preview */}
 					{!captured ? (
 						<Webcam
 							ref={webcamRef}
 							audio={false}
 							screenshotFormat="image/jpeg"
-							screenshotQuality={1}
 							videoConstraints={{
 								facingMode,
-								width: { ideal: 3840 },
-								height: { ideal: 2160 },
+								width: { ideal: 1920 },
+								height: { ideal: 1080 },
 							}}
 							className={`h-full w-full object-cover ${
 								facingMode === "user" ? "scale-x-[-1]" : ""
@@ -105,11 +133,13 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 						/>
 					)}
 
-					{/* Bottom Controls */}
 					{!captured ? (
 						<div className="absolute right-0 bottom-10 left-0 flex justify-center">
-							<button
+							<Button
+								variant="ghost"
 								onClick={capture}
+								type="button"
+								aria-label="Capture photo"
 								className="h-20 w-20 rounded-full border-4 border-white bg-white/20 backdrop-blur-md transition active:scale-95"
 							/>
 						</div>
@@ -117,7 +147,10 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 						<div className="absolute right-0 bottom-10 left-0 flex justify-center gap-4">
 							<Button
 								variant="secondary"
-								onClick={() => setCaptured(null)}>
+								onClick={() => {
+									revokeImage();
+									setCaptured(null);
+								}}>
 								Retake
 							</Button>
 
