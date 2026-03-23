@@ -23,6 +23,7 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 		capture,
 		closeCamera,
 		removeImage,
+		removeLastImage,
 	} = useCamera({ onCapture });
 
 	return (
@@ -110,6 +111,7 @@ const MobileCamera = ({ onCapture }: MobileCameraProps) => {
 					<CameraControls
 						imageCount={images.length}
 						onCapture={capture}
+						onDeleteLast={removeLastImage}
 						onDone={() => {
 							closeCamera();
 							setOpen(false);
